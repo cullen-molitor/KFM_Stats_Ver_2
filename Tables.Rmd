@@ -53,6 +53,14 @@ Mod_df <- arrow::read_feather("Tidy_Data/Mixed_Data_2005.feather") |>
                 IslandCode = as.factor(IslandCode),
                 ReserveStatus = as.factor(ReserveStatus))
 
+mod_1 <- gam(
+  warty_sea_cucumber ~ ReserveStatus + Mean_ONI_Anom + 
+    s(SurveyYear, by = IslandCode) + s(SiteCode, bs = "re"), 
+  data = Mod_df, method = 'REML', family = gaussian
+)
+
+summary(mod_1)
+
 
 mod <- gam(
   warty_sea_cucumber ~ s(SurveyYear, bs = 'cr') + 
@@ -79,9 +87,9 @@ b
 purps <- car::Anova(
   test = "F",
   lme4::lmer(
-    data = Mixed_2005,
+    data = Mod_df,
     purple_sea_urchin ~ California_spiny_lobster * California_sheephead_male * California_sheephead_female * sunflower_star * giant_spined_sea_star + 
-      IslandCode + (1 | SurveyYear))) |> 
+      IslandCode + SurveyYear + (1 | SiteCode))) |> 
   base::as.data.frame() |> 
   tibble::rownames_to_column(var = "Predictor Variable") |> 
   dplyr::arrange(`Pr(>F)`) |> 
