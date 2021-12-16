@@ -1,0 +1,97 @@
+---
+output: html_output
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(here)
+library(sf)
+library(rerddap)
+library(marmap)
+library(raster)
+```
+
+```{r}
+lat_min <- 33.35
+lat_max <- 34.5
+lon_min <- -120.75
+lon_max <- -118.95
+
+lat <- c(lat_min, lat_max)
+lon <- c(lon_min, lon_max)
+
+tm <- c(
+  "2019-01-02T12:00:00Z",
+  '2019-06-30T12:00:00Z'
+)
+
+SST <- 'jplMURSST41'
+field <- 'analysed_sst'
+
+# datasets <- ed_search(query='temperature')
+# datasets_df <- tibble(datasets$info$title, datasets$info$dataset_id)
+```
+
+```{r}
+murSST_west <- griddap(
+  x = SST, 
+  latitude = lat, 
+  longitude = lon,
+  time = tm, 
+  fields = field
+)
+```
+
+```{r}
+sst <- tibble(murSST_west$data) %>% 
+  group_by(lat, lon) %>% 
+  summarise(sst = mean(analysed_sst))
+```
+
+```{r}
+ca <- read_sf(here("GIS_Data", "CA.gpkg"))
+```
+
+```{r}
+ca_bath <- marmap::getNOAA.bathy(
+  lon1 = lon_min - 1,
+  lon2 = lon_max + 1,
+  lat1 = lat_min - 1,
+  lat2 = lat_max + 1,
+  resolution = 1
+) %>% 
+  marmap::as.raster() %>% 
+  raster::rasterToPoints() %>% 
+  base::as.data.frame() 
+```
+
+```{r}
+ggplot() +
+  geom_raster(
+    data = sst, 
+    aes(x = lon, y = lat, fill = sst), 
+    interpolate = T) +
+  scale_fill_viridis_c(option = 'viridis') +
+  geom_sf(data = ca, fill = "grey70", color = "black") +
+  geom_contour(
+    data = ca_bath,
+    aes(x = x, y = y, z = layer), 
+    breaks = seq(
+      from = max(ca_bath$layer), 
+      to = min(ca_bath$layer), 
+      by = -5), 
+    color = "black",
+    alpha = .01, 
+    size = 1) +
+  scale_x_continuous(limits = lon, expand = c(0,0)) +
+  scale_y_continuous(limits = lat, expand = c(0,0)) +
+  labs(fill = "SST (\u00B0C)",
+       x = "Longitude", y = "Latitude") +
+  theme_classic()
+
+```
+
+
+
+
+

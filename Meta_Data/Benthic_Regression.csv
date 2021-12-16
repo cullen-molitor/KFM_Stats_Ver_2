@@ -1,4 +1,4 @@
-Common Name,Reserve Status,Y Intercept,Coefficient,P-Value,D.F.,Standard Error,Adjusted R²
+Common Name,Reserve Status,Y Intercept,Coefficient,P-Value,D.F.,Standard Error,Adjusted RÂ²
 bat star,Inside,0.716,67.777,< 0.001,1,0.987,0.946
 bat star,Outside,6.641,59.006,< 0.001,1,1.301,0.792
 brown gorgonian,Inside,0,140.667,< 0.001,1,7.107,0.617
