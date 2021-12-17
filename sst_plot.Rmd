@@ -9,6 +9,14 @@ library(sf)
 library(rerddap)
 library(marmap)
 library(raster)
+library(cowplot)
+library(ggspatial)
+```
+
+```{r}
+ca <- read_sf(here("GIS_Data", "CA.gpkg"))
+Site_Info <- readr::read_csv("Meta_Data/Site_Info.csv")
+mpa <- read_sf(here("GIS_Data", "MPA.gpkg"))
 ```
 
 ```{r}
@@ -21,8 +29,8 @@ lat <- c(lat_min, lat_max)
 lon <- c(lon_min, lon_max)
 
 tm <- c(
-  "2019-01-02T12:00:00Z",
-  '2019-06-30T12:00:00Z'
+  "2009-01-02T12:00:00Z",
+  '2009-12-30T12:00:00Z'
 )
 
 SST <- 'jplMURSST41'
@@ -30,9 +38,6 @@ field <- 'analysed_sst'
 
 # datasets <- ed_search(query='temperature')
 # datasets_df <- tibble(datasets$info$title, datasets$info$dataset_id)
-```
-
-```{r}
 murSST_west <- griddap(
   x = SST, 
   latitude = lat, 
@@ -49,10 +54,6 @@ sst <- tibble(murSST_west$data) %>%
 ```
 
 ```{r}
-ca <- read_sf(here("GIS_Data", "CA.gpkg"))
-```
-
-```{r}
 ca_bath <- marmap::getNOAA.bathy(
   lon1 = lon_min - 1,
   lon2 = lon_max + 1,
@@ -66,28 +67,64 @@ ca_bath <- marmap::getNOAA.bathy(
 ```
 
 ```{r}
-ggplot() +
-  geom_raster(
-    data = sst, 
-    aes(x = lon, y = lat, fill = sst), 
-    interpolate = T) +
-  scale_fill_viridis_c(option = 'viridis') +
-  geom_sf(data = ca, fill = "grey70", color = "black") +
-  geom_contour(
-    data = ca_bath,
-    aes(x = x, y = y, z = layer), 
-    breaks = seq(
-      from = max(ca_bath$layer), 
-      to = min(ca_bath$layer), 
-      by = -5), 
-    color = "black",
-    alpha = .01, 
-    size = 1) +
-  scale_x_continuous(limits = lon, expand = c(0,0)) +
-  scale_y_continuous(limits = lat, expand = c(0,0)) +
-  labs(fill = "SST (\u00B0C)",
-       x = "Longitude", y = "Latitude") +
-  theme_classic()
+box <- sf::st_polygon(
+  x = list(
+    rbind(
+      c(lon_min, lat_max), 
+      c(lon_max, lat_max), 
+      c(lon_max, lat_min), 
+      c(lon_min, lat_min),
+      c(lon_min, lat_max)
+    )
+  )
+) %>% st_sfc(crs = 4326)
+
+C <- ggplot() +
+  geom_sf(data = ca, fill = "white", size = 1) +
+  geom_sf(data = box, fill = NA, size = 1, color = 'red') +
+  theme_void() +
+  theme(panel.border = element_rect(fill = NA),
+        panel.background = element_rect(fill = alpha("white", .5)))
+```
+
+```{r fig.height=5, fig.width=7.5, warning=F, message=F}
+
+main.plot <- ggplot() +
+  geom_raster(data = sst, aes(x = lon, y = lat, fill = sst), interpolate = T) +
+  scale_fill_viridis_c(option = 'viridis', guide = guide_colorbar(
+    direction = "horizontal",frame.colour = "black",
+    title.position = "top", barheight = unit(.25, 'cm'))) +
+  geom_sf(data = ca, fill = "grey70", color = "grey40", size = .1) +
+  geom_contour(data = ca_bath, aes(x = x, y = y, z = layer), 
+    breaks = seq(min(ca_bath$layer), max(ca_bath$layer), by = 5), 
+    color = "black", alpha = .01, size = 1) +
+  scale_x_continuous(limits = lon, expand = c(0,0), breaks = c(-120, -119.5)) +
+  scale_y_continuous(limits = lat, expand = c(0,0), breaks = c(33.75, 34.25)) +
+  # geom_sf(data = mpa, fill = NA, color = "white") +
+  geom_point(data = Site_Info, aes(x = Longitude, y = Latitude),
+             color = '#d55b23', show.legend = F, inherit.aes = F) +
+  scale_color_viridis_d(option = 'magma', begin = .2, end = .8, limits = force) +
+  labs(fill = "SST (\u00B0C)", x = NULL, y = NULL) +
+  annotation_scale(location = "bl") +
+  annotation_north_arrow(which_north = TRUE, location = "tr", pad_x = unit(2.75, "cm"),
+                         height = unit(1, "cm"), width = unit(1, "cm")) +
+  theme_classic() +
+  theme(legend.position = c(0.125, 0.12),
+        legend.title = element_text(face = 'bold'),
+        legend.text = element_text(face = 'bold'),
+        legend.background = element_rect(fill = alpha("white", .25), colour = 'black'),
+        axis.ticks.length = unit(-0.25, "cm"),
+        axis.ticks = element_line(color = "black", size = 2),
+        axis.text.y = element_text(hjust = .5, margin = margin(0,-.7,0,-.5, unit = 'cm'),
+                                   face = 'bold', color = "white", angle = 270),
+        axis.text.x = element_text(vjust = 5, margin = margin(-0.5,0,0.5,0, unit = 'cm'),
+                                   face = 'bold', color = "white"),
+        panel.border = element_rect(color = "black", size = 2, fill = NA)
+  )
+
+ggdraw() +
+  draw_plot(main.plot) +
+  draw_plot(C, x = 0.72, y = .77, width = .2, height = .2)
 
 ```
 
